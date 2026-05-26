@@ -1,0 +1,62 @@
+# 数据库
+database:
+  host: localhost
+  dbname: titan_collector
+  user: betting
+  password: betting123
+  pool_min: 1
+  pool_max: 5
+
+# 数据源
+sources:
+  nowscore:
+    ws_url: "wss://ws.nowscore.com/stream"
+    token_url: "https://live.nowscore.com/data/index.aspx?type=token"
+    bf1_url: "https://live.nowscore.com/data/bf1.js"
+    channels: ["change_xml", "ch_goal3_xml", "ch_goal8_xml"]
+    headers:
+      User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      Referer: "https://live.nowscore.com/"
+
+# FB体育
+fb_sports:
+  site_url: "https://18.167.221.88:48356/"
+  username: ll0602
+  password: wp8649562
+  headless: true
+
+# 信号检测
+signals:
+  big_ou:
+    threshold: 6.5
+    late_window: [75, 87]  # 高价值窗口
+    mid_window: [45, 74]   # 不推送
+  late_odds:
+    window: [80, 87]
+    line_diff_threshold: 0.5
+    under_threshold: 1.8
+    cutoff_minute: 87  # 87分钟后不推
+
+# 推送
+alerts:
+  log_file: alerts.log
+  feishu_enabled: true
+
+# 风控
+risk:
+  max_daily_bets: 10
+  max_daily_loss: 500
+  bet_amount: 100
+  max_drift_pct: 10.0
+  auto_accept_better: true
+
+# 运行时
+runtime:
+  scan_interval: 60
+  ws_stale_timeout: 120
+  ws_max_silent_base: 180
+  ws_max_silent_idle: 600
+  memory_limit_mb: 800
+  memory_warn_mb: 300
+  alerted_max_size: 1000
+  timezone: "Asia/Shanghai"

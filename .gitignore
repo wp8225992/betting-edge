@@ -1,0 +1,9 @@
+*.pid
+*.log
+*.db
+*.sqlite3
+*.json
+__pycache__/
+*.pyc
+browser_session/
+browser_session_fast/
