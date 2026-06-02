@@ -5,5 +5,7 @@
 *.json
 __pycache__/
 *.pyc
+.venv/
 browser_session/
+browser_session_auto/
 browser_session_fast/

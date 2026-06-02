@@ -179,9 +179,9 @@ class FBSportsBrowser:
             self.logged_in = True
             return True
         
-        log.warning("⚠️ 登录状态不确定，继续")
-        self.logged_in = True
-        return True
+        log.warning("⚠️ 登录状态不确定，停止后续流程")
+        self.logged_in = False
+        return False
 
     async def navigate_to_sports(self):
         """导航到体育页面"""
@@ -495,7 +495,7 @@ class FBSportsBrowser:
                         return {ok: false, msg: 'failed'};
                     await new Promise(r => setTimeout(r, 100));
                 }
-                return {ok: true, msg: 'clicked'};
+                return {ok: false, err: 'result_timeout'};
             }
         ''', bet_amount)
         
@@ -504,6 +504,8 @@ class FBSportsBrowser:
         
         result["action"] = confirm.get('msg', 'placed')
         result["confirm_odds"] = result["click_odds"]
+        if result["action"] != 'success':
+            return False, {"error": f"unexpected_result:{result['action']}", **result}
         
         if result["action"] == 'success':
             log.info(f"✅ 投注成功! {home} vs {away} {bet_side} @ {result['confirm_odds']:.3f}")
@@ -600,7 +602,11 @@ async def main():
     
     # 启动
     await browser.start()
-    await browser.login()
+    if not await browser.login():
+        log.error("登录失败，退出")
+        await browser.stop()
+        db.close()
+        return
     await browser.navigate_to_sports()
     
     balance = await browser.get_balance()
@@ -656,9 +662,9 @@ async def main():
                     away=match['away'],
                     bet_side=bet_side,
                     market=match.get('market', 'total'),
-                    odds_at_scan=details.get('scan_odds'),
-                    odds_at_click=details.get('click_odds'),
-                    odds_at_confirm=details.get('confirm_odds'),
+                    scan_odds=details.get('scan_odds'),
+                    click_odds=details.get('click_odds'),
+                    confirm_odds=details.get('confirm_odds'),
                     odds_drift_pct=details.get('drift_pct'),
                     bet_amount=bet_amount if success else 0,
                     action=details.get('action', 'unknown'),

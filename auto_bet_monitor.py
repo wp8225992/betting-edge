@@ -99,7 +99,7 @@ def already_bet_today(conn, match_key, bet_side):
     )
     return cur.fetchone() is not None
 
-def record_bet(conn, match_key, bet_side, odds, amount, strategy_id=None, result="placed"):
+def record_bet(conn, match_key, bet_side, odds, amount, strategy_id=None, result="placed", count_daily=True):
     """记录投注"""
     today = datetime.now().strftime("%Y-%m-%d")
     now = datetime.now().isoformat()
@@ -107,14 +107,15 @@ def record_bet(conn, match_key, bet_side, odds, amount, strategy_id=None, result
         "INSERT INTO bet_history (match_key, bet_side, bet_time, odds, amount, strategy_id, result) VALUES (?, ?, ?, ?, ?, ?, ?)",
         (match_key, bet_side, now, odds, amount, strategy_id, result)
     )
-    conn.execute(
-        "INSERT OR REPLACE INTO daily_stats (date, bet_count, total_loss) VALUES (?, ?, ?)",
-        (today, 1, amount)
-    )
-    conn.execute(
-        "UPDATE daily_stats SET bet_count = bet_count + 1 WHERE date = ? AND bet_count = 0",
-        (today,)
-    )
+    if count_daily:
+        conn.execute(
+            "INSERT OR IGNORE INTO daily_stats (date, bet_count, total_loss) VALUES (?, 0, 0)",
+            (today,)
+        )
+        conn.execute(
+            "UPDATE daily_stats SET bet_count = bet_count + 1, total_loss = total_loss + ? WHERE date = ?",
+            (amount, today)
+        )
     conn.commit()
     log.info(f"📝 已记录: {match_key} {bet_side} @ {odds}")
 
@@ -185,6 +186,13 @@ def parse_ou_line(s):
         return float(s)
     except:
         return 0
+
+def build_match_key(match):
+    """Stable key for preventing repeat bets on the same match."""
+    home = (match.get("home") or "").strip()
+    away = (match.get("away") or "").strip()
+    league = (match.get("league") or "").strip()
+    return f"{league}_{home}_{away}"
 
 # ==================== 策略匹配 ====================
 
@@ -508,26 +516,58 @@ class AutoBetBrowser:
             # 1. 按索引点击比赛打开盘口面板
             click_result = await frame.evaluate("""
                 async (p) => {
-                    const {idx} = p;
+                    const {idx, home, away, hScore, aScore, minute} = p;
                     const items = document.querySelectorAll('.home-match-info');
                     if (idx >= items.length) return {ok: false, err: 'index_out_of_range'};
                     const target = items[idx];
+                    const teams = target.querySelectorAll('.team-name');
+                    const currentHome = teams[0]?.innerText?.trim() || '';
+                    const currentAway = teams[1]?.innerText?.trim() || '';
+                    if (currentHome !== home || currentAway !== away) {
+                        return {ok: false, err: 'match_mismatch'};
+                    }
+                    const scoreEl = target.querySelector('.score, .vs-score, .match-score, .score-live');
+                    if (scoreEl) {
+                        const scoreText = scoreEl.innerText?.trim() || '';
+                        const parts = scoreText.split(/[-–—]/);
+                        const currentH = parseInt(parts[0]?.trim());
+                        const currentA = parts.length > 1 ? parseInt(parts[1]?.trim()) : NaN;
+                        if (!Number.isNaN(currentH) && !Number.isNaN(currentA) &&
+                            (currentH !== hScore || currentA !== aScore)) {
+                            return {ok: false, err: 'score_mismatch'};
+                        }
+                    }
+                    const minEl = target.querySelector('.state.red, .minute, .time-state');
+                    const minText = minEl?.innerText?.trim() || '';
+                    const minMatch = minText.match(/^(\\d+)/);
+                    const currentMinute = minMatch ? parseInt(minMatch[1]) : null;
+                    if (currentMinute !== null && minute > 0 && Math.abs(currentMinute - minute) > 1) {
+                        return {ok: false, err: 'minute_mismatch'};
+                    }
                     const teamContainer = target.querySelector('.team-container, .teams-container');
                     if (teamContainer) teamContainer.click();
                     else target.click();
                     await new Promise(r => setTimeout(r, 500));
                     return {ok: true};
                 }
-            """, {"idx": idx})
+            """, {
+                "idx": idx,
+                "home": home,
+                "away": away,
+                "hScore": fb_match.get("hScore", 0),
+                "aScore": fb_match.get("aScore", 0),
+                "minute": fb_match.get("minute", -1),
+            })
             
             if not click_result.get("ok"):
                 return False, click_result.get("err", "click_fail")
             
             # 2. 点击赔率
             odds_idx = 1 if bet_side == "under" else 0
+            scan_odds = fb_match.get("underOdds") if bet_side == "under" else fb_match.get("overOdds")
             odds_result = await frame.evaluate("""
                 async (params) => {
-                    const {oddsIdx} = params;
+                    const {oddsIdx, scanOdds} = params;
                     const box = document.querySelector('.match-full-odds-total');
                     if (!box) return {ok: false, err: 'no_total_box'};
                     
@@ -538,6 +578,9 @@ class AutoBetBrowser:
                     const oddsEl = target.querySelector('.value') || target;
                     const odds = parseFloat(oddsEl.innerText?.trim());
                     if (!odds || isNaN(odds)) return {ok: false, err: 'parse_odds_fail'};
+                    if (scanOdds && Math.abs(odds - scanOdds) > 0.05) {
+                        return {ok: false, err: 'odds_mismatch', odds};
+                    }
                     
                     target.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
                     target.dispatchEvent(new MouseEvent('mouseup', {bubbles: true}));
@@ -545,7 +588,7 @@ class AutoBetBrowser:
                     
                     return {ok: true, odds};
                 }
-            """, {"oddsIdx": odds_idx})
+            """, {"oddsIdx": odds_idx, "scanOdds": scan_odds})
             
             if not odds_result.get("ok"):
                 return False, odds_result.get("err", "odds_fail")
@@ -601,7 +644,7 @@ class AutoBetBrowser:
                             return {ok: false, msg: 'failed'};
                         await new Promise(r => setTimeout(r, 100));
                     }
-                    return {ok: true, msg: 'clicked'};
+                    return {ok: false, err: 'result_timeout'};
                 }
             """, amount)
             
@@ -611,8 +654,7 @@ class AutoBetBrowser:
             msg = confirm_result.get("msg", "unknown")
             if msg == "success":
                 return True, f"success @ {odds:.3f}"
-            else:
-                return True, f"{msg} @ {odds:.3f}"
+            return False, f"unexpected_result:{msg} @ {odds:.3f}"
                 
         except Exception as e:
             return False, f"exception: {str(e)}"
@@ -699,7 +741,7 @@ async def main():
             # 执行投注
             for idx, fb_match, strategy_id, reason in candidates:
                 # 用队名+比分+分钟做match_key防止重复
-                match_key = f"{fb_match['home']}_{fb_match['away']}_{fb_match['hScore']}-{fb_match['aScore']}_{fb_match['minute']}min"
+                match_key = build_match_key(fb_match)
                 
                 # 检查是否已投注
                 if already_bet_today(local_db, match_key, "under"):
@@ -718,7 +760,7 @@ async def main():
                     log.info(f"✅ 投注完成: {result}")
                 else:
                     log.warning(f"❌ 投注失败: {result}")
-                    record_bet(local_db, match_key, "under", fb_match.get("underOdds", 0), BET_AMOUNT, strategy_id, f"failed:{result}")
+                    record_bet(local_db, match_key, "under", fb_match.get("underOdds", 0), BET_AMOUNT, strategy_id, f"failed:{result}", count_daily=False)
             
             await asyncio.sleep(SCAN_INTERVAL)
     
