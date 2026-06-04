@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 strategy_rules.py — 基于历史回测的多策略引擎
-数据来源: titan_collector 527场完场比赛（首次出现>=6.5盘口）
-更新: 2026-05-26（自动生成）
+数据来源: titan_collector 742场完场比赛（首次出现>=6.5盘口）
+更新: 2026-06-04（自动生成）
 
 核心发现：
-- 6球+80分后+赔率≥0.80 → EV+0.450, 93.8%≤7 (16场)
-- 6球+80分后+赔率≥0.65 → EV+0.428, 93.9%≤7 (33场)
-- 6球+80分后+赔率≥0.60 → EV+0.376, 92.7%≤7 (41场)
+- 6球+80分后+赔率≥0.85 → EV+0.388, 89.5%≤7 (19场)
+- 6球+80分后+赔率≥0.65 → EV+0.340, 88.9%≤7 (45场)
+- 6球+80分后+赔率≥0.60 → EV+0.333, 89.7%≤7 (58场)
 """
 
 def parse_ou_line(s):
@@ -25,49 +25,49 @@ def parse_ou_line(s):
 
 
 # ============================================================
-# 历史回测策略规则表（527场，样本≥10，按EV排序）
+# 历史回测策略规则表（742场，样本≥10，按EV排序）
 # ============================================================
 
 STRATEGY_RULES = [
-    {"id": "S1", "goals": 6, "minute_min": 80, "under_odds_min": 0.8,
-     "ev": 0.45, "win_pct": 93.8, "sample": 16, "confidence": "MEDIUM",
-     "note": "6球+80分后+赔率≥0.80"},
+    {"id": "S1", "goals": 6, "minute_min": 80, "under_odds_min": 0.85,
+     "ev": 0.388, "win_pct": 89.5, "sample": 19, "confidence": "MEDIUM",
+     "note": "6球+80分后+赔率≥0.85"},
     {"id": "S2", "goals": 6, "minute_min": 80, "under_odds_min": 0.65,
-     "ev": 0.428, "win_pct": 93.9, "sample": 33, "confidence": "HIGH",
+     "ev": 0.34, "win_pct": 88.9, "sample": 45, "confidence": "HIGH",
      "note": "6球+80分后+赔率≥0.65"},
     {"id": "S3", "goals": 6, "minute_min": 80, "under_odds_min": 0.6,
-     "ev": 0.376, "win_pct": 92.7, "sample": 41, "confidence": "HIGH",
+     "ev": 0.333, "win_pct": 89.7, "sample": 58, "confidence": "HIGH",
      "note": "6球+80分后+赔率≥0.60"},
-    {"id": "S4", "goals": 6, "minute_min": 75, "under_odds_min": 0.65,
-     "ev": 0.355, "win_pct": 88.3, "sample": 60, "confidence": "HIGH",
-     "note": "6球+75分后+赔率≥0.65"},
-    {"id": "S5", "goals": 6, "minute_min": 75, "under_odds_min": 0.6,
-     "ev": 0.333, "win_pct": 88.2, "sample": 68, "confidence": "HIGH",
-     "note": "6球+75分后+赔率≥0.60"},
-    {"id": "S6", "goals": 6, "minute_min": 70, "under_odds_min": 0.65,
-     "ev": 0.312, "win_pct": 84.8, "sample": 79, "confidence": "HIGH",
-     "note": "6球+70分后+赔率≥0.65"},
-    {"id": "S7", "goals": 6, "minute_min": 70, "under_odds_min": 0.6,
-     "ev": 0.3, "win_pct": 85.1, "sample": 87, "confidence": "HIGH",
-     "note": "6球+70分后+赔率≥0.60"},
-    {"id": "S8", "goals": 5, "minute_min": 60, "under_odds_min": 0.9,
-     "ev": 0.25, "win_pct": 76.9, "sample": 26, "confidence": "MEDIUM",
+    {"id": "S4", "goals": 5, "minute_min": 60, "under_odds_min": 0.9,
+     "ev": 0.294, "win_pct": 80.0, "sample": 35, "confidence": "HIGH",
      "note": "5球+60分后+赔率≥0.90"},
-    {"id": "S9", "goals": 6, "minute_min": 65, "under_odds_min": 0.65,
-     "ev": 0.237, "win_pct": 80.6, "sample": 98, "confidence": "HIGH",
-     "note": "6球+65分后+赔率≥0.65"},
-    {"id": "S10", "goals": 6, "minute_min": 65, "under_odds_min": 0.6,
-     "ev": 0.233, "win_pct": 81.1, "sample": 106, "confidence": "HIGH",
-     "note": "6球+65分后+赔率≥0.60"},
-    {"id": "S11", "goals": 5, "minute_min": 70, "under_odds_min": 0.7,
-     "ev": 0.164, "win_pct": 75.8, "sample": 33, "confidence": "HIGH",
+    {"id": "S5", "goals": 6, "minute_min": 75, "under_odds_min": 0.85,
+     "ev": 0.288, "win_pct": 81.6, "sample": 49, "confidence": "HIGH",
+     "note": "6球+75分后+赔率≥0.85"},
+    {"id": "S6", "goals": 6, "minute_min": 70, "under_odds_min": 0.85,
+     "ev": 0.266, "win_pct": 80.0, "sample": 70, "confidence": "HIGH",
+     "note": "6球+70分后+赔率≥0.85"},
+    {"id": "S7", "goals": 6, "minute_min": 70, "under_odds_min": 0.6,
+     "ev": 0.225, "win_pct": 81.5, "sample": 135, "confidence": "HIGH",
+     "note": "6球+70分后+赔率≥0.60"},
+    {"id": "S8", "goals": 5, "minute_min": 70, "under_odds_min": 0.9,
+     "ev": 0.218, "win_pct": 76.2, "sample": 21, "confidence": "MEDIUM",
+     "note": "5球+70分后+赔率≥0.90"},
+    {"id": "S9", "goals": 5, "minute_min": 70, "under_odds_min": 0.7,
+     "ev": 0.209, "win_pct": 77.1, "sample": 35, "confidence": "HIGH",
      "note": "5球+70分后+赔率≥0.70"},
-    {"id": "S12", "goals": 6, "minute_min": 60, "under_odds_min": 0.75,
-     "ev": 0.163, "win_pct": 77.0, "sample": 87, "confidence": "HIGH",
-     "note": "6球+60分后+赔率≥0.75"},
-    {"id": "S13", "goals": 6, "minute_min": 60, "under_odds_min": 0.6,
-     "ev": 0.161, "win_pct": 76.7, "sample": 116, "confidence": "HIGH",
-     "note": "6球+60分后+赔率≥0.60"},
+    {"id": "S10", "goals": 5, "minute_min": 70, "under_odds_min": 0.75,
+     "ev": 0.191, "win_pct": 76.5, "sample": 34, "confidence": "HIGH",
+     "note": "5球+70分后+赔率≥0.75"},
+    {"id": "S11", "goals": 6, "minute_min": 65, "under_odds_min": 0.85,
+     "ev": 0.188, "win_pct": 77.3, "sample": 88, "confidence": "HIGH",
+     "note": "6球+65分后+赔率≥0.85"},
+    {"id": "S12", "goals": 5, "minute_min": 60, "under_odds_min": 0.85,
+     "ev": 0.183, "win_pct": 76.6, "sample": 47, "confidence": "HIGH",
+     "note": "5球+60分后+赔率≥0.85"},
+    {"id": "S13", "goals": 6, "minute_min": 65, "under_odds_min": 0.6,
+     "ev": 0.17, "win_pct": 78.8, "sample": 160, "confidence": "HIGH",
+     "note": "6球+65分后+赔率≥0.60"},
 ]
 
 

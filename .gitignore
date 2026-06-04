@@ -1,11 +1,27 @@
+# Browser sessions (huge cache)
+auto_bet/browser_session/
+auto_bet/browser_session_fast/
+
+# Research artifacts
+research/html/
+research/scripts/
+research/data/
+
+# Historical data files
+data/
+
+# PID files, logs, SQLite
 *.pid
 *.log
 *.db
 *.sqlite3
-*.json
+
+# Alerts and live data
+auto_bet/alerted.json
+auto_bet/live_signals.json
+auto_bet/bet_instruction.json
+
+# Python
 __pycache__/
 *.pyc
-.venv/
-browser_session/
-browser_session_auto/
-browser_session_fast/
+*.pyo
