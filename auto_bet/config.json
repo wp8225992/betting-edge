@@ -1,0 +1,33 @@
+{
+  "site_url": "https://18.167.221.88:48356/",
+  "username": "ll0602",
+  "password": "wp8649562",
+  "headless": true,
+  "simulation_mode": false,
+
+  "strategy": {
+    "name": "seven_goal_line",
+    "description": "7球大小球卡点策略（盘口7/7.25，当时6球+赔率≥0.70买小，EV+0.502）",
+    "sport": "football",
+    "market": "total",
+    "bet_side": "under",
+    "ou_line_min": 6.875,
+    "ou_line_max": 7.125,
+    "min_total_goals": 6,
+    "under_threshold": 0.70,
+    "bet_amount": 200,
+    "max_daily_bets": 5,
+    "max_daily_loss": 300
+  },
+
+  "odds_change": {
+    "max_drift_pct": 10.0,
+    "auto_accept_better": true,
+    "reject_if_worse_than_pct": 5.0,
+    "max_retries": 2,
+    "retry_delay_sec": 3
+  },
+
+  "scan_interval_sec": 60,
+  "log_file": "/home/ubuntu/betting-edge/auto_bet/betting.log"
+}

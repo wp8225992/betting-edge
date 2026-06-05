@@ -25,3 +25,4 @@ auto_bet/bet_instruction.json
 __pycache__/
 *.pyc
 *.pyo
+browser_session_auto/
