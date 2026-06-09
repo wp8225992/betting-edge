@@ -34,8 +34,21 @@ import psycopg2.pool
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 # ─── 配置 ───────────────────────────────────────────────
-# 主配置 - 只需要修改这个路径，其他路径自动生成
-BASE_DIR = "/Users/linlin/PycharmProjects/betting-edge"
+# 动态配置 - 自动检测系统，适配macOS和Linux
+import platform
+
+SYSTEM = platform.system()  # Darwin=macOS, Linux=Linux
+
+if SYSTEM == "Darwin":
+    BASE_DIR = "/Users/linlin/PycharmProjects/betting-edge"
+    FEISHU_ENV = "/Users/linlin/.hermes/.env"
+elif SYSTEM == "Linux":
+    BASE_DIR = "/home/ubuntu/betting-edge"
+    FEISHU_ENV = "/home/ubuntu/.hermes/.env"
+else:
+    BASE_DIR = os.getcwd()  # 其他系统使用当前目录
+    FEISHU_ENV = os.path.expanduser("~/.hermes/.env")
+
 AUTO_BET_DIR = f"{BASE_DIR}/auto_bet"
 
 PG_DSN = "host=localhost dbname=titan_collector user=betting password=betting123 port=5432"
@@ -775,8 +788,8 @@ def push_alert(msg):
 
 def _send_feishu_alert(msg):
     """发送飞书告警"""
-    # 从.env读取飞书配置
-    feishu_env = "/Users/linlin/.hermes/.env"
+    # 使用动态配置的飞书环境文件路径
+    feishu_env = FEISHU_ENV
     app_id = ""
     app_secret = ""
     

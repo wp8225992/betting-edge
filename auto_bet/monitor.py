@@ -3,7 +3,7 @@
 采集器状态监控脚本 (crontab运行)
 判断标准:
 - 进程存在: pgrep找到PID
-- 进程活跃: CPU使用率>0
+- 进程活跃: 状态不是Z/T
 - 日志活跃: 最近5分钟有新日志输出
 
 触发条件: 任一不满足则发送飞书告警
@@ -14,11 +14,27 @@ import sys
 import os
 import json
 import requests
+import time
+import platform
 from datetime import datetime, timedelta
 
+# ─── 动态配置 ───────────────────────────────────────────────
+SYSTEM = platform.system()  # Darwin=macOS, Linux=Linux
+
+if SYSTEM == "Darwin":
+    BASE_DIR = "/Users/linlin/PycharmProjects/betting-edge"
+    FEISHU_ENV = "/Users/linlin/.hermes/.env"
+elif SYSTEM == "Linux":
+    BASE_DIR = "/home/ubuntu/betting-edge"
+    FEISHU_ENV = "/home/ubuntu/.hermes/.env"
+else:
+    BASE_DIR = os.getcwd()
+    FEISHU_ENV = os.path.expanduser("~/.hermes/.env")
+
+AUTO_BET_DIR = f"{BASE_DIR}/auto_bet"
 # 配置
 COLLECTOR_SCRIPT_NAME = "nowscore_snapshot_collector.py"
-LOG_FILE = "/Users/linlin/PycharmProjects/betting-edge/auto_bet/nowscore_snapshot_collector.log"
+LOG_FILE = f"{AUTO_BET_DIR}/nowscore_snapshot_collector.log"
 
 # 飞书配置 - 从.env文件读取
 def load_feishu_config():
@@ -26,7 +42,7 @@ def load_feishu_config():
     app_id = ""
     app_secret = ""
     try:
-        with open("/Users/linlin/.hermes/.env", "r") as f:
+        with open(FEISHU_ENV, "r") as f:
             for line in f:
                 if line.startswith("FEISHU_APP_ID"):
                     app_id = line.split("=")[1].strip()
