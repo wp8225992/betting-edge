@@ -9,7 +9,7 @@ import os
 import urllib.request
 import urllib.error
 
-ENV_FILE = "/home/ubuntu/.hermes/.env"
+ENV_FILE = "/Users/linlin/.hermes/.env"
 
 def load_env():
     """从 .env 文件读取飞书凭证"""

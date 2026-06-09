@@ -26,6 +26,7 @@ import sys
 import signal
 import subprocess
 import logging
+import requests
 from datetime import datetime, timezone, timedelta
 
 import psycopg2
@@ -33,9 +34,13 @@ import psycopg2.pool
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
 # ─── 配置 ───────────────────────────────────────────────
-PG_DSN = "host=localhost dbname=titan_collector user=betting password=betting123"
-ALERTS_LOG = "/home/ubuntu/betting-edge/auto_bet/alerts.log"
-ALERTED_FILE = "/home/ubuntu/betting-edge/auto_bet/alerted.json"
+# 主配置 - 只需要修改这个路径，其他路径自动生成
+BASE_DIR = "/Users/linlin/PycharmProjects/betting-edge"
+AUTO_BET_DIR = f"{BASE_DIR}/auto_bet"
+
+PG_DSN = "host=localhost dbname=titan_collector user=betting password=betting123 port=5432"
+ALERTS_LOG = f"{AUTO_BET_DIR}/alerts.log"
+ALERTED_FILE = f"{AUTO_BET_DIR}/alerted.json"
 
 BJ = timezone(timedelta(hours=8))
 
@@ -44,7 +49,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("/home/ubuntu/betting-edge/auto_bet/nowscore_snapshot_collector.log"),
+        logging.FileHandler(f"{AUTO_BET_DIR}/nowscore_snapshot_collector.log"),
         logging.StreamHandler(),
     ],
 )
@@ -757,24 +762,83 @@ def normalize_match_key(home: str, away: str, kickoff: str) -> str:
     return f"{h}_vs_{a}_{k}"
 
 def push_alert(msg):
-    """写入alerts.log, cron会定时推送到飞书"""
+    """直接推送飞书"""
     now = datetime.now(BJ).strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{now}] {msg}\n"
     log.info(f"ALERT: {msg}")
+    
+    # 直接推送飞书
     try:
-        with open(ALERTS_LOG, "a") as f:
-            f.write(line)
+        _send_feishu_alert(msg)
     except Exception as e:
-        log.error(f"Alert write error: {e}")
+        log.error(f"飞书推送失败: {e}")
+
+
+def _send_feishu_alert(msg):
+    """发送飞书告警"""
+    # 从.env读取飞书配置
+    feishu_env = "/Users/linlin/.hermes/.env"
+    app_id = ""
+    app_secret = ""
+    
+    try:
+        with open(feishu_env, "r") as f:
+            for line in f:
+                if line.startswith("FEISHU_APP_ID"):
+                    app_id = line.split("=")[1].strip()
+                elif line.startswith("FEISHU_APP_SECRET"):
+                    app_secret = line.split("=")[1].strip()
+    except Exception as e:
+        log.error(f"读取飞书配置失败: {e}")
+        return
+    
+    if not app_id or not app_secret:
+        log.error("飞书配置缺失")
+        return
+    
+    # 获取token
+    token_url = "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+    try:
+        resp = requests.post(token_url, json={
+            "app_id": app_id,
+            "app_secret": app_secret
+        }, timeout=10)
+        data = resp.json()
+        token = data.get("tenant_access_token", "")
+        if not token:
+            log.error(f"获取飞书token失败: {data}")
+            return
+    except Exception as e:
+        log.error(f"获取飞书token失败: {e}")
+        return
+    
+    # 发送消息
+    chat_id = "oc_facfa4d99bbd966673eccecc586a39ce"
+    send_url = "https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id"
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    msg_data = {
+        "receive_id": chat_id,
+        "msg_type": "text",
+        "content": json.dumps({"text": msg})
+    }
+    
+    try:
+        resp = requests.post(send_url, headers=headers, json=msg_data, timeout=10)
+        if resp.status_code == 200:
+            log.info("飞书推送成功")
+        else:
+            log.error(f"飞书推送失败: {resp.text}")
+    except Exception as e:
+        log.error(f"飞书推送失败: {e}")
 
 
 # ═══════════════════════════════════════════════════════
 # 自动投注决策（内置，直接用已有分析数据）
 # ═══════════════════════════════════════════════════════
-LIVE_SIGNALS_FILE = "/home/ubuntu/betting-edge/auto_bet/live_signals.json"
-BET_INSTRUCTION_FILE = "/home/ubuntu/betting-edge/auto_bet/bet_instruction.json"
-CALIBRATION_FILE = "/home/ubuntu/betting-edge/auto_bet/bet_calibration.json"
-BET_HISTORY_FILE = "/home/ubuntu/betting-edge/auto_bet/bet_history.json"
+LIVE_SIGNALS_FILE = f"{AUTO_BET_DIR}/live_signals.json"
+BET_INSTRUCTION_FILE = f"{AUTO_BET_DIR}/bet_instruction.json"
+CALIBRATION_FILE = f"{AUTO_BET_DIR}/bet_calibration.json"
+BET_HISTORY_FILE = f"{AUTO_BET_DIR}/bet_history.json"
 QUERY_RESULT_FILE = "/tmp/bet_query_result.json"
 
 # 回测基准（2026-05-14 7球卡点回测）
@@ -1067,7 +1131,7 @@ def _auto_bet_decision(sig):
         subprocess.Popen(
             ['/usr/bin/python3.12', executor_path],
             env=env,
-            stdout=open('/home/ubuntu/betting-edge/auto_bet/executor_stdout.log', 'a'),
+            stdout=open(f'{AUTO_BET_DIR}/executor_stdout.log', 'a'),
             stderr=subprocess.STDOUT,
             start_new_session=True,  # 脱离采集器进程组
         )
@@ -1083,17 +1147,26 @@ def main():
     global running
     
     # PID文件：防止多实例同时运行
-    pid_file = "/home/ubuntu/betting-edge/auto_bet/nowscore_snapshot.pid"
+    pid_file = f"{AUTO_BET_DIR}/nowscore_snapshot.pid"
     if os.path.exists(pid_file):
         try:
             with open(pid_file) as f:
                 old_pid = int(f.read().strip())
-            os.kill(old_pid, 0)
-            log.error(f"Another instance running (PID={old_pid}), exiting")
-            return
-        except (ProcessLookupError, ValueError):
-            log.info(f"Stale PID file (PID={old_pid}), removing")
-            os.remove(pid_file)
+            # 检查进程是否存在且是采集器进程（而不是只检查PID存在）
+            result = subprocess.run(["ps", "-p", str(old_pid), "-o", "command="], capture_output=True, text=True)
+            cmd = result.stdout.strip()
+            if "nowscore_snapshot_collector.py" in cmd:
+                log.error(f"Another instance running (PID={old_pid}), exiting")
+                return
+            else:
+                log.info(f"Stale PID file (PID={old_pid}, cmd={cmd}), removing")
+                os.remove(pid_file)
+        except (ProcessLookupError, ValueError, subprocess.SubprocessError) as e:
+            log.info(f"Stale PID file, removing: {e}")
+            try:
+                os.remove(pid_file)
+            except:
+                pass
     
     with open(pid_file, "w") as f:
         f.write(str(os.getpid()))
